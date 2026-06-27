@@ -47,21 +47,23 @@ def get_random_logo():
     if logos: return random.choice(logos)
     return None
 
-# مخازن تست شده و کاملاً فعال در این ساعت
+# مخازن کانفیگ v2ray
 config_sources = [
     "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
     "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/v2ray/mix"
 ]
 
+# 📌 منابع جدید، معتبر و کاملاً زنده پروکسی MTProto (تست شده) 📌
 proxy_sources = [
-    "https://raw.githubusercontent.com/Anand-Asura/MTProto-Proxy/main/proxy.txt",
-    "https://raw.githubusercontent.com/VPNBL/MTProto-Proxy/main/MTProto"
+    "https://raw.githubusercontent.com/SoliSpirit/mtproto/master/all_proxies.txt",
+    "https://raw.githubusercontent.com/ALIILAPRO/MTProtoProxy/main/mtproto.txt",
+    "https://raw.githubusercontent.com/Borders-Freedom/Sub-Collector/main/Proxy/MTProto"
 ]
 
 raw_configs = []
 raw_proxies = []
 
-print("=== 🔍 شروع استخراج اطلاعات ===")
+print("=== 🔍 شروع استخراج اطلاعات از مخازن جهانی ===")
 for url in config_sources:
     try:
         res = requests.get(url, timeout=10)
@@ -73,12 +75,16 @@ for url in config_sources:
 for url in proxy_sources:
     try:
         res = requests.get(url, timeout=10)
+        print(f"🔗 در حال بررسی منبع پروکسی: {url} | کد پاسخ سرور: {res.status_code}")
         if res.status_code == 200:
-            # صید دقیق لینک‌های پروکسی تلگرام
-            found = re.findall(r'((?:https?://t\.me|tg)://proxy\?server=[^\s"\'><]+)', res.text)
+            # فرمول صید هوشمند برای انواع لینک‌های پروکسی تلگرام (tg:// و https://t.me)
+            found = re.findall(r'((?:https?://[^\s#"\'>]+/proxy\?server=[^\s"\'><]+|tg://proxy\?server=[^\s"\'><]+))', res.text)
+            print(f"✅ تعداد پروکسی با موفقیت استخراج شد: {len(found)}")
             for p in found: 
+                # دکمه‌های شیشه‌ای تلگرام فقط لینک‌های استاندارد https را قبول می‌کنند و با tg:// ارور می‌دهند
                 raw_proxies.append(p.replace("tg://", "https://t.me/"))
-    except: pass
+    except Exception as e: 
+        print(f"❌ خطا در خواندن این منبع پروکسی: {e}")
 
 # فیلتر تکراری‌ها
 valid_configs = history["leftover_configs"]
@@ -89,21 +95,17 @@ valid_proxies = history["leftover_proxies"]
 for p in raw_proxies:
     if p not in valid_proxies and p not in history["sent_proxies_hashes"]: valid_proxies.append(p)
 
-print(f"📊 آمار نهایی دیتابیس -> کانفیگ‌های نو: {len(valid_configs)} | پروکسی‌های نو: {len(valid_proxies)}")
+print(f"\n📊 آمار نهایی کل دیتابیس -> کانفیگ‌های نو: {len(valid_configs)} | پروکسی‌های نو: {len(valid_proxies)}")
 
-# اگر مخازن پروکسی جهانی به هر دلیلی صفر بودند، دیتای پشتیبان فوری تزریق می‌شود تا تست نخوابد
-if len(valid_proxies) < 3:
-    print("⚠️ استفاده از پروکسی‌های پشتیبان اضطراری...")
-    valid_proxies.extend([
-        "https://t.me/proxy?server=1.1.1.1&port=443&secret=ee00000000000000000000000000000000",
-        "https://t.me/proxy?server=8.8.8.8&port=8443&secret=ee00000000000000000000000000000000",
-        "https://t.me/proxy?server=9.9.9.9&port=443&secret=ee00000000000000000000000000000000"
-    ])
-
-if len(valid_configs) < 3:
-    print("تعداد کانفیگ کافی نیست.")
+# شرط حد نصاب پارت تست (حداقل ۳ عدد)
+if len(valid_configs) < 3 or len(valid_proxies) < 3:
+    print("⚠️ دیتای نو (کانفیگ یا پروکسی) به حد نصاب ۳ عدد نرسیده است. توقف ارسال.")
+    history["leftover_configs"] = valid_configs
+    history["leftover_proxies"] = valid_proxies
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f: json.dump(history, f, ensure_ascii=False, indent=2)
     sys.exit(0)
 
+# جدا کردن سهمیه پارت تست
 configs_to_send = valid_configs[:3]
 history["leftover_configs"] = valid_configs[3:]
 proxies_to_send = valid_proxies[:3]
@@ -112,7 +114,7 @@ history["leftover_proxies"] = valid_proxies[3:]
 sent_in_this_batch_configs = []
 country_stats = {}
 
-print("🚀 شروع ارسال پارت تست به کانال با پروتکل امن HTML...")
+print("\n🚀 شلیک پارت تست به کانال تلگرام با فرمت امن HTML...")
 for i in range(1):
     batch_c = configs_to_send
     batch_p = proxies_to_send
@@ -129,7 +131,7 @@ for i in range(1):
         final_cfg = f"{clean_cfg}#{serial_str} - {flag} {country} | @freenettir"
         sent_in_this_batch_configs.append(final_cfg)
         
-        # استفاده از تگ <code> برای کپی آسان با یک کلیک توسط کاربر کانال
+        # استفاده از تگ <code> برای قابلیت کپی خودکار با یک ضربه مخاطب
         post_text += f"<b>📌 سرور {labels[idx]} :</b>\n<code>{final_cfg}</code>\n\n"
         history["sent_hashes"].append(hash(cfg))
 
@@ -147,25 +149,29 @@ for i in range(1):
     try:
         if logo and os.path.exists(logo):
             with open(logo, 'rb') as photo_file:
-                requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={
+                res_tg = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={
                     "chat_id": CHANNEL, "caption": post_text, "parse_mode": "HTML", "reply_markup": json.dumps(reply_markup)
-                }, files={"photo": photo_file})
+                }, files={"photo": photo_file}).json()
         else:
-            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={
+            res_tg = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={
                 "chat_id": CHANNEL, "text": post_text, "parse_mode": "HTML", "reply_markup": json.dumps(reply_markup)
-            })
-        print("✅ پست تستی با موفقیت ارسال شد.")
-    except Exception as e: print(f"خطا در ارسال پست: {e}")
+            }).json()
+        
+        if res_tg.get("ok"):
+            print("✅ پست ۳ تایی با موفقیت به تلگرام ارسال شد.")
+        else:
+            print(f"❌ خطای تلگرام در ارسال پست: {res_tg.get('description')}")
+    except Exception as e: print(f"❌ خطا در درخواست ارسال پست: {e}")
 
-# --- ارسال فایل‌های متنی پایان پارت ---
-print("📝 ارسال استیکر و فایل‌ها...")
+# --- بخش فینال و ارسال فایلهای متنی پارت تست ---
+print("\n📝 ارسال استیکر و فایل‌های متنی پایان پارت...")
 try: requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHANNEL, "text": "📝"})
 except: pass
 
 time.sleep(2)
 support_markup = {"inline_keyboard": [[{"text": "🏛️ حمایت از کانال", "url": f"https://t.me/freenettir"}]]}
 
-# فایل کانفیگ‌ها
+# فایل ۱۰۰ کانفیگ آخر
 config_file_name = "100_Latest_Servers.txt"
 with open(config_file_name, "w", encoding="utf-8") as f: f.write("\n\n".join(sent_in_this_batch_configs))
 
@@ -181,12 +187,13 @@ try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendDocument", data={
             "chat_id": CHANNEL, "caption": config_caption, "reply_markup": json.dumps(support_markup)
         }, files={"document": file_data})
+    print("✅ فایل متنی کانفیگ‌ها ارسال شد.")
 except: pass
 if os.path.exists(config_file_name): os.remove(config_file_name)
 
 time.sleep(2)
 
-# فایل پروکسی‌ها
+# فایل ۱۰۰ پروکسی آخر
 proxy_file_name = "100_Latest_Proxies.txt"
 with open(proxy_file_name, "w", encoding="utf-8") as f: f.write("\n\n".join(proxies_to_send))
 
@@ -197,8 +204,9 @@ try:
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendDocument", data={
             "chat_id": CHANNEL, "caption": proxy_caption, "reply_markup": json.dumps(support_markup)
         }, files={"document": file_data})
+    print("✅ فایل متنی پروکسی‌ها ارسال شد.")
 except: pass
 if os.path.exists(proxy_file_name): os.remove(proxy_file_name)
 
 with open(HISTORY_FILE, "w", encoding="utf-8") as f: json.dump(history, f, ensure_ascii=False, indent=2)
-print("🎯 پارت تست با موفقیت ۱۰۰٪ به پایان رسید.")
+print("🎯 پارت تست با موفقیت کامل به پایان رسید.")
