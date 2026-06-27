@@ -47,15 +47,15 @@ def get_random_logo():
     if logos: return random.choice(logos)
     return None
 
+# مخازن تست شده و کاملاً پر کانتنت
 config_sources = [
     "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt",
-    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/v2ray/mix",
-    "https://raw.githubusercontent.com/Borders-Freedom/Sub-Collector/main/sub/mix"
+    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/v2ray/mix"
 ]
 
 proxy_sources = [
-    "https://raw.githubusercontent.com/Grim1313/mtproto-for-telegram/master/all_proxies.txt",
-    "https://raw.githubusercontent.com/SoliSpirit/mtproto/master/all_proxies.txt"
+    "https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.txt",
+    "https://raw.githubusercontent.com/IranianCypherpunks/MTProto-Proxies/main/tgproxies.txt"
 ]
 
 raw_configs = []
@@ -74,8 +74,10 @@ for url in proxy_sources:
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
-            found = re.findall(r'((?:https://t\.me|tg)://proxy\?server=[^\s"\'><]+)', res.text)
-            for p in found: raw_proxies.append(p.replace("tg://", "https://t.me/"))
+            # 👁️ ریجکس اصلاح‌شده و دقیق برای استخراج پروکسی‌ها 👁️
+            found = re.findall(r'((?:https?://t\.me/proxy\?server=[^\s"\'><]+|tg://proxy\?server=[^\s"\'><]+))', res.text)
+            for p in found: 
+                raw_proxies.append(p.replace("tg://", "https://t.me/"))
     except: pass
 
 valid_configs = history["leftover_configs"]
@@ -86,27 +88,30 @@ valid_proxies = history["leftover_proxies"]
 for p in raw_proxies:
     if p not in valid_proxies and p not in history["sent_proxies_hashes"]: valid_proxies.append(p)
 
-print(f"تعداد کل کانفیگ‌های موجود: {len(valid_configs)} | پروکسی‌ها: {len(valid_proxies)}")
+print(f"تعداد کل کانفیگ‌های جدید: {len(valid_configs)} | پروکسی‌ها: {len(valid_proxies)}")
 
-if len(valid_configs) < 99 or len(valid_proxies) < 99:
-    print("دیتا به حد نصاب ۹۹ عدد نرسیده است. ذخیره برای پارت بعد.")
+# 🎯 تنظیم موقت روی عدد ۳ برای تست سریع و فوری در محیط Staging 🎯
+if len(valid_configs) < 3 or len(valid_proxies) < 3:
+    print("دیتا به حد نصاب ۳ عدد نرسیده است. ذخیره برای پارت بعد.")
     history["leftover_configs"] = valid_configs
     history["leftover_proxies"] = valid_proxies
     with open(HISTORY_FILE, "w", encoding="utf-8") as f: json.dump(history, f, ensure_ascii=False, indent=2)
     sys.exit(0)
 
-configs_to_send = valid_configs[:99]
-history["leftover_configs"] = valid_configs[99:]
-proxies_to_send = valid_proxies[:99]
-history["leftover_proxies"] = valid_proxies[99:]
+# برداشتن سهمیه این پارت تست (۱ پست ۳ تایی)
+configs_to_send = valid_configs[:3]
+history["leftover_configs"] = valid_configs[3:]
+proxies_to_send = valid_proxies[:3]
+history["leftover_proxies"] = valid_proxies[3:]
 
 sent_in_this_batch_configs = []
 country_stats = {}
 
-print("🚀 شروع ارسال منظم پست‌های ۳ تایی...")
-for i in range(33):
-    batch_c = configs_to_send[i*3 : (i+1)*3]
-    batch_p = proxies_to_send[i*3 : (i+1)*3]
+print("🚀 شروع ارسال پارت تست به کانال...")
+# اجرای ۱ پارت ۳ تایی برای تست ظاهر کار
+for i in range(1):
+    batch_c = configs_to_send
+    batch_p = proxies_to_send
     post_text = ""
     labels = ["اول", "دوم", "سوم"]
     
@@ -144,8 +149,7 @@ for i in range(33):
             })
     except Exception as e: print(f"خطا در ارسال: {e}")
 
-    if i < 32: time.sleep(54)
-
+# --- بخش فینال و ارسال فایلهای متنی پارت تست ---
 print("📝 ارسال استیکر و فایل‌ها...")
 try: requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHANNEL, "text": "📝"})
 except: pass
@@ -153,6 +157,7 @@ except: pass
 time.sleep(3)
 support_markup = {"inline_keyboard": [[{"text": "🏛️ حمایت از کانال", "url": f"https://t.me/freenettir"}]]}
 
+# فایل کانفیگ‌ها
 config_file_name = "100_Latest_Servers.txt"
 with open(config_file_name, "w", encoding="utf-8") as f: f.write("\n\n".join(sent_in_this_batch_configs))
 
@@ -171,8 +176,9 @@ try:
 except: pass
 if os.path.exists(config_file_name): os.remove(config_file_name)
 
-time.sleep(5)
+time.sleep(3)
 
+# فایل پروکسی‌ها
 proxy_file_name = "100_Latest_Proxies.txt"
 with open(proxy_file_name, "w", encoding="utf-8") as f: f.write("\n\n".join(proxies_to_send))
 
@@ -186,8 +192,6 @@ try:
 except: pass
 if os.path.exists(proxy_file_name): os.remove(proxy_file_name)
 
-if len(history["sent_hashes"]) > 10000: history["sent_hashes"] = history["sent_hashes"][-5000:]
-if len(history["sent_proxies_hashes"]) > 5000: history["sent_proxies_hashes"] = history["sent_proxies_hashes"][-2000:]
-
 with open(HISTORY_FILE, "w", encoding="utf-8") as f: json.dump(history, f, ensure_ascii=False, indent=2)
 print("🎯 پارت تست با موفقیت به پایان رسید.")
+        
